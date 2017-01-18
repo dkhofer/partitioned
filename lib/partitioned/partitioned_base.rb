@@ -112,7 +112,7 @@ module Partitioned
       new_arel_table = @arel_tables[[partition_key_values, as]]
       
       unless new_arel_table
-        arel_engine_hash = {:engine => self.arel_engine, :as => as}
+        arel_engine_hash = {:type_caster => self.arel_engine, :as => as}
         new_arel_table = Arel::Table.new(self.partition_table_name(*partition_key_values), arel_engine_hash)
         @arel_tables[[partition_key_values, as]] = new_arel_table
       end
@@ -158,7 +158,10 @@ module Partitioned
     # @return [Hash] the scoping
     def self.from_partition(*partition_key_values)
       table_alias_name = partition_table_alias_name(*partition_key_values)
-      return ActiveRecord::Relation.new(self, self.arel_table_from_key_values(partition_key_values, table_alias_name))
+      table = self.arel_table_from_key_values(partition_key_values, table_alias_name)
+      predicate_builder = ActiveRecord::PredicateBuilder.new(table)
+      binding.pry
+      return ActiveRecord::Relation.new(self, table, predicate_builder)
     end
 
     #

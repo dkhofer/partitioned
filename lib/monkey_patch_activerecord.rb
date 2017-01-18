@@ -55,10 +55,12 @@ module ActiveRecord
       @new_record = false
       id
     end
-
+=begin
     # Updates the associated record with values matching those of the instance attributes.
     # Returns the number of affected rows.
-    def _update_record(attribute_names = @attributes.keys)
+    def _update_record(attribute_names = self.attribute_names)
+      
+      
       # ****** BEGIN PARTITIONED PATCH ******
       # NOTE(hofer): This patch ensures the columns the table is
       # partitioned on are passed along to the update code so that the
@@ -69,12 +71,40 @@ module ActiveRecord
         attribute_names.uniq!
       end
       # ****** END PARTITIONED PATCH ******
+      
       attributes_values = arel_attributes_with_values_for_update(attribute_names)
       if attributes_values.empty?
-        0
+        rows_affected = 0
+        @_trigger_update_callback = true
       else
-        self.class.unscoped._update_record attributes_values, id, id_was
+        rows_affected = self.class.unscoped._update_record attributes_values, id, id_in_database
+        @_trigger_update_callback = rows_affected > 0
       end
+      rows_affected
+    end
+=end
+    # Updates the associated record with values matching those of the instance attributes.
+    # Returns the number of affected rows.
+    def _update_record(attribute_names = self.attribute_names)
+      # ****** BEGIN PARTITIONED PATCH ******
+      # NOTE(hofer): This patch ensures the columns the table is
+      # partitioned on are passed along to the update code so that the
+      # update statement runs against a child partition, not the
+      # parent table, to help with performance.
+      if self.class.respond_to?(:partition_keys)
+        attribute_names.concat self.class.partition_keys.map(&:to_s)
+        attribute_names.uniq!
+      end
+      
+      attributes_values = arel_attributes_with_values_for_update(attribute_names)
+      if attributes_values.empty?
+        rows_affected = 0
+        @_trigger_update_callback = true
+      else
+        rows_affected = self.class.unscoped._update_record attributes_values, id, id_was
+        @_trigger_update_callback = rows_affected > 0
+      end
+      rows_affected
     end
 
   end # module Persistence
@@ -144,6 +174,28 @@ module ActiveRecord
         nil,
         binds)
     end
+    
+    def _update_record(values, id, id_was) # :nodoc:
+      substitutes, binds = substitute_values values
+
+      scope = @klass.unscoped
+
+      if @klass.finder_needs_type_condition?
+        scope.unscope!(where: @klass.inheritance_column)
+      end
+
+      relation = scope.where(@klass.primary_key => (id_was || id))
+      bvs = binds + relation.bound_attributes
+      um = relation
+        .arel
+        .compile_update(substitutes, @klass.primary_key)
+
+      @klass.connection.update(
+        um,
+        "SQL",
+        bvs,
+      )
+    end
 
     # NOTE(hofer): This monkeypatch intended for activerecord 4.1.  Based on this code:
     # https://github.com/rails/rails/blob/4-1-stable/activerecord/lib/active_record/relation.rb#L73-L88
@@ -156,11 +208,16 @@ module ActiveRecord
       if @klass.finder_needs_type_condition?
         scope.unscope!(where: @klass.inheritance_column)
       end
+      
+      relation = scope.where(@klass.primary_key => (id_was || id))
+      bvs = binds + relation.bound_attributes
+      um = relation
+        .arel
+        .compile_update(substitutes, @klass.primary_key)
 
       # ****** BEGIN PARTITIONED PATCH ******
       if @klass.respond_to?(:dynamic_arel_table)
         using_arel_table = @klass.dynamic_arel_table(Hash[*values.map { |k,v| [k.name,v] }.flatten])
-        um = scope.where(using_arel_table[@klass.primary_key].eq(id_was || id)).arel.compile_update(substitutes, @klass.primary_key)
 
         # NOTE(hofer): The um variable got set up using
         # klass.arel_table as its arel value.  So arel_table.name is
@@ -171,20 +228,20 @@ module ActiveRecord
         begin
           @klass.arel_table.name = using_arel_table.name
           @klass.connection.update(
-                                   um,
-                                   'SQL',
-                                   binds)
+            um,
+            "SQL",
+            bvs,
+          )
         ensure
           @klass.arel_table.name = @klass.table_name
         end
       else
         # Original lines:
-        um = scope.where(@klass.arel_table[@klass.primary_key].eq(id_was || id)).arel.compile_update(substitutes, @klass.primary_key)
-
         @klass.connection.update(
-                                 um,
-                                 'SQL',
-                                 binds)
+          um,
+          "SQL",
+          bvs,
+        )
       end
       # ****** END PARTITIONED PATCH ******
     end
