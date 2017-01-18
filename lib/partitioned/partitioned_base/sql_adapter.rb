@@ -164,7 +164,7 @@ module Partitioned
       def create_partition_table(*partition_key_values)
         create_table(configurator.table_name(*partition_key_values), {
                        :id => false,
-                       :options => "INHERITS (#{configurator.parent_table_name(*partition_key_values)})"
+                       :options => "( ) INHERITS (#{configurator.parent_table_name(*partition_key_values)})"
                      }) do |t|
         end
         add_check_constraint(*partition_key_values)

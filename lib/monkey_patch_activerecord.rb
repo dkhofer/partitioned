@@ -17,26 +17,19 @@ module ActiveRecord
     # This method is patched to provide a relation referencing the partition instead
     # of the parent table.
     def relation_for_destroy
-      pk         = self.class.primary_key
-      column     = self.class.columns_hash[pk]
-      substitute = self.class.connection.substitute_at(column, 0)
 
       # ****** BEGIN PARTITIONED PATCH ******
       if self.class.respond_to?(:dynamic_arel_table)
         using_arel_table = dynamic_arel_table()
-        relation = ActiveRecord::Relation.new(self.class, using_arel_table).
-          where(using_arel_table[pk].eq(substitute))
+        self.class.unscoped.from_partition(using_arel_table).where(self.class.primary_key => id)
       else
         # ****** END PARTITIONED PATCH ******
 
-        relation = self.class.unscoped.where(self.class.arel_table[pk].eq(substitute))
+        self.class.unscoped.where(self.class.primary_key => id)
 
         # ****** BEGIN PARTITIONED PATCH ******
       end
       # ****** END PARTITIONED PATCH ******
-
-      relation.bind_values = [[column, id]]
-      relation
     end
 
     # This method is patched to prefetch the primary key (if necessary) and to ensure
@@ -116,12 +109,12 @@ module ActiveRecord
 
       if primary_key && Hash === values
         primary_key_value = values[values.keys.find { |k|
-                                     k.name == primary_key
-                                   }]
+          k.name == primary_key
+        }]
 
-        if !primary_key_value && connection.prefetch_primary_key?(klass.table_name)
-          primary_key_value = connection.next_sequence_value(klass.sequence_name)
-          values[klass.arel_table[klass.primary_key]] = primary_key_value
+        if !primary_key_value && klass.prefetch_primary_key?
+          primary_key_value = klass.next_sequence_value
+          values[arel_attribute(klass.primary_key)] = primary_key_value
         end
       end
 
@@ -135,16 +128,7 @@ module ActiveRecord
       im.into actual_arel_table
       # ****** END PARTITIONED PATCH ******
 
-      conn = @klass.connection
-
-      substitutes = values.sort_by { |arel_attr,_| arel_attr.name }
-      binds       = substitutes.map do |arel_attr, value|
-        [@klass.columns_hash[arel_attr.name], value]
-      end
-
-      substitutes.each_with_index do |tuple, i|
-        tuple[1] = conn.substitute_at(binds[i][0], i)
-      end
+      substitutes, binds = substitute_values values
 
       if values.empty? # empty insert
         im.values = Arel.sql(connection.empty_insert_statement_value)
@@ -152,13 +136,13 @@ module ActiveRecord
         im.insert substitutes
       end
 
-      conn.insert(
-                  im,
-                  'SQL',
-                  primary_key,
-                  primary_key_value,
-                  nil,
-                  binds)
+      @klass.connection.insert(
+        im,
+        "SQL",
+        primary_key || false,
+        primary_key_value,
+        nil,
+        binds)
     end
 
     # NOTE(hofer): This monkeypatch intended for activerecord 4.1.  Based on this code:
