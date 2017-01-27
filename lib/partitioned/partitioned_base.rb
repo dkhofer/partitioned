@@ -159,8 +159,7 @@ module Partitioned
     def self.from_partition(*partition_key_values)
       table_alias_name = partition_table_alias_name(*partition_key_values)
       table = self.arel_table_from_key_values(partition_key_values, table_alias_name)
-      predicate_builder = ActiveRecord::PredicateBuilder.new(table)
-      return ActiveRecord::Relation.new(self, table, predicate_builder)
+      from(table)
     end
 
     #

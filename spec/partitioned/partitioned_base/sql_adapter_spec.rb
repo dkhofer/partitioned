@@ -175,7 +175,7 @@ module Partitioned
             SELECT count(*) FROM pg_class
             where relname = 'p1_id_udx'
           SQL
-          expect(result.values).to eq [["1"]]
+          expect(result.values).to eq [[1]]
         end
       end # add_partition_table_index
 
