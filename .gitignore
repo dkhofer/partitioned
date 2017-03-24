@@ -5,3 +5,6 @@ Gemfile.lock
 /.bundle
 /spec/dummy/db/structure.sql
 /spec/dummy/db/schema.rb
+
+
+/.idea
