@@ -281,7 +281,7 @@ module Partitioned
       #
       def add_references_to_partition_table(*partition_key_values)
         configurator.foreign_keys(*partition_key_values).each do |foreign_key|
-          add_foreign_key(partition_table_name(*partition_key_values),
+          add_foreign_key_with_partition(partition_table_name(*partition_key_values),
                           foreign_key.referencing_field,
                           foreign_key.referenced_table,
                           foreign_key.referenced_field)
@@ -326,7 +326,7 @@ module Partitioned
 
       extend Forwardable
       def_delegators :parent_table_class, :connection, :find_by_sql, :transaction, :find, :configurator
-      def_delegators :connection, :execute, :add_index, :remove_index, :create_schema, :drop_schema, :add_foreign_key,
+      def_delegators :connection, :execute, :add_index, :remove_index, :create_schema, :drop_schema, :add_foreign_key_with_partition,
                      :create_table, :drop_table
     end
   end
