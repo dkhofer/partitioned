@@ -135,7 +135,7 @@ module ActiveRecord::ConnectionAdapters
 
     end # drop_schema
 
-    describe "add_foreign_key" do
+    describe "add_foreign_key_with_partition" do
 
       it "added foreign key constraint" do
         create_new_schema
@@ -148,7 +148,7 @@ module ActiveRecord::ConnectionAdapters
             id      serial not null primary key
           );
         SQL
-        ActiveRecord::Base.connection.add_foreign_key("employees_partitions.temp", :company_id, "companies", :id)
+        ActiveRecord::Base.connection.add_foreign_key_with_partition("employees_partitions.temp", :company_id, "companies", :id)
         result = ActiveRecord::Base.connection.execute <<-SQL
           SELECT constraint_type FROM information_schema.table_constraints
           WHERE table_name = 'temp' AND constraint_name = 'temp_company_id_fkey';
@@ -156,7 +156,7 @@ module ActiveRecord::ConnectionAdapters
         expect(result.values.first).to eq ["FOREIGN KEY"]
       end
 
-    end # add_foreign_key
+    end # add_foreign_key_with_partition
 
   end # PostgreSQLAdapter
 

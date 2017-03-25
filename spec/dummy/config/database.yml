@@ -2,7 +2,7 @@ common: &common
   adapter: postgresql
   username: postgres
   password: postgres
-  encoding: SQL_ASCII
+#  encoding: SQL_ASCII
   template: template0
   pool: 5
   timeout: 5000
