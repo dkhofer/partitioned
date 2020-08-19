@@ -1,3 +1,12 @@
+# THIS FORK IS NO LONGER MAINTAINED
+Over the years we learned that there are many better ways to implement partitioning than using this gem.
+You can partition your database on dbms level, either physically or logically.
+
+For more info and guidelines please refer to official PostgreSQL documentation:
+https://www.postgresql.org/docs/12/ddl-partitioning.html
+
+We are removing the usage of this gem from our projects, and we will no longer support our fork.
+
 # Partitioned
 
 Partitioned adds assistance to ActiveRecord for manipulating (reading,
